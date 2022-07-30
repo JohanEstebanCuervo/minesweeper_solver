@@ -184,7 +184,7 @@ class solver_mw():
 
         if len(squares) == self.Num_Cells:
             points = np.array(points)
-            points += int(moda // 2)
+            points += int(moda // 2) # Num_celd * 2
 
             args = np.argsort(points[:, 1])
 
@@ -218,7 +218,7 @@ class solver_mw():
             inicix = int(self.points[cell, 1] - self.size_cell // 2)
             iniciy = int(self.points[cell, 0] - self.size_cell // 2)
             rect_cell = juego[inicix: inicix + self.size_cell, iniciy:iniciy + self.size_cell, :]
-            rect_list = rect_cell.reshape((-1, 3))
+            rect_list = rect_cell.reshape((-1, 3)) # Num_pixeles * 3 RGB
 
             for index in range(len(rect_list)):
 
@@ -346,12 +346,12 @@ class solver_mw():
             Remove.append(Cell + 1)
             Remove.append(Cell + self.columns + 1)
 
-        if Cell - self.rows < 0:
+        if Cell - self.columns < 0:
             Remove.append(Cell - self.columns - 1)
             Remove.append(Cell - self.columns)
             Remove.append(Cell - self.columns + 1)
 
-        if Cell + self.rows > self.Num_Cells - 1:
+        if Cell + self.columns > self.Num_Cells - 1:
             Remove.append(Cell + self.columns - 1)
             Remove.append(Cell + self.columns)
             Remove.append(Cell + self.columns + 1)
@@ -414,7 +414,6 @@ class solver_mw():
                     rand = int(np.random.random() * len(self.Cell_unknown))
                     free.append(self.Cell_unknown[rand])
                     self.ClickCells(free)
-
                     print('Aleatorio!')
 
             if not self.Cell_unknown:
