@@ -346,7 +346,7 @@ class solver_mw():
         booms = list(set(booms))
         return free_booms, booms
 
-    def CalculateNeigt(self, Cell):
+    def CalculateNeigt(self, Cell, cant = 'All'):
         Neighbours = []
         Remove = []
         Neighbours.append(Cell - self.columns - 1)
@@ -379,6 +379,12 @@ class solver_mw():
             Remove.append(Cell + self.columns)
             Remove.append(Cell + self.columns + 1)
 
+        if cant == 'rect':
+            Remove.append(Cell - self.columns - 1)
+            Remove.append(Cell - self.columns + 1)
+            Remove.append(Cell + self.columns - 1)
+            Remove.append(Cell + self.columns + 1)
+
         Remove = list(set(Remove))
 
         for R in Remove:
@@ -409,17 +415,21 @@ class solver_mw():
                 if val == -2:
                     Num_Booms += 1
 
-            Val = self.Logic_Matrix[Cell // self.columns, Cell % self.columns]
+            Val = self.Logic_Matrix[Cell // self.columns, Cell % self.columns] - Num_Booms
             Dif = Num_emptys - (Val + Num_Booms)
             for empty in emptys:
-                emptys_sum[empty] = Val - Num_Booms
+                emptys_sum[empty] = Val
 
-            for Cell2 in Neighbours:
+            Neighbours4 = self.CalculateNeigt(Cell, cant='rect')
+            for Cell2 in Neighbours4:
                 sumas = emptys_sum.copy()
                 if self.Logic_Matrix[Cell2 // self.columns, Cell2 % self.columns] < 1:
                     continue
 
                 if Cell2 < Cell:
+                    continue
+
+                if not (Cell2 in self.Active_cells):
                     continue
 
                 Neighbours2 = self.CalculateNeigt(Cell2)
@@ -436,35 +446,40 @@ class solver_mw():
                     if val == -2:
                         Num_Booms2 += 1
 
-                Val2 = self.Logic_Matrix[Cell2 // self.columns, Cell2 % self.columns]
+                Val2 = self.Logic_Matrix[Cell2 // self.columns, Cell2 % self.columns] - Num_Booms2
                 Dif2 = Num_emptys2 - (Val2 + Num_Booms2)
 
                 for empty in emptys2:
 
                     if empty in emptys:
-                        sumas[empty] += Val2 - Num_Booms2
+                        sumas[empty] += Val2
 
                     else:
 
-                        sumas[empty] = Val2 - Num_Booms2
+                        sumas[empty] = Val2
 
                 minimum = min(sumas.values())
-                valores = list(np.array(list(sumas.values())) - minimum)
+                valores = list(np.array(list(sumas.values())))
+                claves = list(sumas.keys())
 
-                if minimum == 1:
-                    if valores.count(0) == 1 and np.abs(Dif2 - Dif) == 1 and np.abs(Val - Val2) != 1:
-                        index_0 = valores.index(0)
-                        free_booms.append(list(sumas.keys())[index_0])
+                if len(sumas) == 3 and valores.count(minimum) == 1:
 
-                    if valores.count(1) == 1 and Dif2 == Dif:
-                        index_b = valores.index(1)
-                        booms.append(list(sumas.keys())[index_b])
+                    if Val + Val2 == 2:
+                        index = valores.index(minimum)
+                        free_booms.append(claves[index])
 
-                else:
+                    if Val + Val2 == 3:
+                        index = valores.index(minimum)
+                        booms.append(claves[index])
 
-                    if valores.count(0) == 1:
-                        index_b = valores.index(0)
-                        booms.append(list(sumas.keys())[index_b])
+                if len(sumas) == 4 and valores.count(minimum) == 1 and valores.count(minimum + 1) == 1:
+
+                    if Val + Val2 == 3:
+                        index = valores.index(minimum)
+                        free_booms.append(claves[index])
+
+                        index = valores.index(minimum + 1)
+                        booms.append(claves[index])
 
         free_booms = list(set(free_booms))
         booms = list(set(booms))
@@ -507,15 +522,13 @@ class solver_mw():
             Actualice_ok = False
             Attemp = 0
             while not Actualice_ok and Attemp < 10:
-                bandera = 1
+                Actualice_ok = True
                 Attemp += 1
                 self.RefreshGame()
                 for point_free in free:
                     if point_free in self.Cell_unknown:
-                        bandera = 0
+                        Actualice_ok = False
                         continue
-                if bandera:
-                    Actualice_ok = True
 
             if Attemp == 10 and not Actualice_ok:
 

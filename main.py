@@ -5,6 +5,6 @@ import time
 print('espera')
 time.sleep(1)
 print('inicia')
-solver = solver_mw(difficulty='expert', random=True)
+solver = solver_mw(difficulty='expert', random=False)
 #  solver.InitGame(tim=5, browser='chrome')
 solver.solve()
