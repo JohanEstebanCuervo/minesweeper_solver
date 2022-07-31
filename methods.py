@@ -24,6 +24,7 @@ class solver_mw():
         self.three = np.array([255, 0, 0]).astype('int')
         self.four = np.array([0, 0, 123]).astype('int')
         self.five = np.array([123, 0, 0]).astype('int')
+        self.six = np.array([0, 123, 123]).astype('int')
         self.empty = np.array([123, 123, 123]).astype('int')
 
     def InitGame(self, tim, browser='chrome'):
@@ -52,16 +53,22 @@ class solver_mw():
             self.rows = 8
             self.columns = 8
             self.booms = 10
+            self.relac1 = 1.24
+            self.relac2 = 1.25
 
         elif difficulty == 'intermediate':
             self.rows = 16
             self.columns = 16
             self.booms = 40
+            self.relac1 = 1.12
+            self.relac2 = 1.13
 
         elif difficulty == 'expert':
             self.rows = 16
-            self.columns = 30
+            self.columns = 31
             self.booms = 99
+            self.relac1 = 0.61
+            self.relac2 = 0.61
 
         else:
 
@@ -103,7 +110,7 @@ class solver_mw():
                 else:
                     relac = 0
 
-                if relac == 1.24 or relac == 1.25:
+                if relac == self.relac1 or relac == self.relac2:
 
                     ventana.append(approx)
 
@@ -184,7 +191,7 @@ class solver_mw():
 
         if len(squares) == self.Num_Cells:
             points = np.array(points)
-            points += int(moda // 2) # Num_celd * 2
+            points += int(moda // 2)  # Num_celd * 2
 
             args = np.argsort(points[:, 1])
 
@@ -198,6 +205,9 @@ class solver_mw():
             self.points = points
             self.size_cell = int(moda) - 2
             return 0
+
+        else:
+            print('Se encontraron:', len(squares), 'Cuadros de:', self.Num_Cells)
 
         return 1
 
@@ -218,41 +228,48 @@ class solver_mw():
             inicix = int(self.points[cell, 1] - self.size_cell // 2)
             iniciy = int(self.points[cell, 0] - self.size_cell // 2)
             rect_cell = juego[inicix: inicix + self.size_cell, iniciy:iniciy + self.size_cell, :]
-            rect_list = rect_cell.reshape((-1, 3)) # Num_pixeles * 3 RGB
+            rect_list = rect_cell.reshape((-1, 3))  # Num_pixeles * 3 RGB
 
             for index in range(len(rect_list)):
 
                 if np.array_equal(self.one, rect_list[index, :]):
 
-                    self.Logic_Matrix[cell // self.rows, cell % self.columns] = 1
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 1
                     self.Active_cells.append(cell)
                     delete.append(cell)
                     break
 
                 if np.array_equal(self.two, rect_list[index, :]):
 
-                    self.Logic_Matrix[cell // self.rows, cell % self.columns] = 2
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 2
                     self.Active_cells.append(cell)
                     delete.append(cell)
                     break
 
                 if np.array_equal(self.three, rect_list[index, :]):
 
-                    self.Logic_Matrix[cell // self.rows, cell % self.columns] = 3
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 3
                     self.Active_cells.append(cell)
                     delete.append(cell)
                     break
 
                 if np.array_equal(self.four, rect_list[index, :]):
 
-                    self.Logic_Matrix[cell // self.rows, cell % self.columns] = 4
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 4
                     self.Active_cells.append(cell)
                     delete.append(cell)
                     break
 
                 if np.array_equal(self.five, rect_list[index, :]):
 
-                    self.Logic_Matrix[cell // self.rows, cell % self.columns] = 5
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 5
+                    self.Active_cells.append(cell)
+                    delete.append(cell)
+                    break
+
+                if np.array_equal(self.six, rect_list[index, :]):
+
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 6
                     self.Active_cells.append(cell)
                     delete.append(cell)
                     break
@@ -263,7 +280,7 @@ class solver_mw():
 
                 if index > pixels / 4:
 
-                    self.Logic_Matrix[cell // self.rows, cell % self.columns] = 0
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 0
                     delete.append(cell)
                     break
 
@@ -273,6 +290,7 @@ class solver_mw():
     def CalculateBooms(self):
 
         free_booms = []
+        booms = []
         Remove_act_cells = []
         Remove_Cell_unlock = []
 
@@ -284,7 +302,7 @@ class solver_mw():
             Num_emptys = 0
             emptys = []
             for Neighbour in Neighbours:
-                val = self.Logic_Matrix[Neighbour // self.rows, Neighbour % self.columns]
+                val = self.Logic_Matrix[Neighbour // self.columns, Neighbour % self.columns]
                 if val == -1:
                     Num_emptys += 1
                     emptys.append(Neighbour)
@@ -292,13 +310,14 @@ class solver_mw():
                 if val == -2:
                     Num_Booms += 1
 
-            Dif = int(self.Logic_Matrix[Cell // self.rows, Cell % self.columns]) - Num_Booms
+            Dif = int(self.Logic_Matrix[Cell // self.columns, Cell % self.columns]) - Num_Booms
 
             if Dif == Num_emptys:
                 Remove_act_cells.append(Cell)
                 for empty in emptys:
                     Remove_Cell_unlock.append(empty)
-                    self.Logic_Matrix[empty // self.rows, empty % self.columns] = -2
+                    self.Logic_Matrix[empty // self.columns, empty % self.columns] = -2
+                    booms.append(empty)
 
             elif Dif == 0:
                 Remove_act_cells.append(Cell)
@@ -321,7 +340,9 @@ class solver_mw():
         for re in Remove_Cell_unlock:
             self.Cell_unknown.remove(re)
 
-        return free_booms
+        free_booms = list(set(free_booms))
+        booms = list(set(booms))
+        return free_booms, booms
 
     def CalculateNeigt(self, Cell):
         Neighbours = []
@@ -397,12 +418,14 @@ class solver_mw():
                 print('No fue posible actualizar los valores del juego')
                 sys.exit()
 
-            free = self.CalculateBooms()
-            free = list(set(free))
+            free, booms = self.CalculateBooms()
 
             if free:
                 self.ClickCells(free)
                 print(free)
+
+            if booms:
+                self.ClickCells(booms,button='right')
 
             if np.array_equal(self.Logic_Matrix_After, self.Logic_Matrix) and not free:
                 max_rand -= 1
