@@ -1,7 +1,7 @@
 import numpy as np
 
-rows = 3
-columns = 5
+rows = 16
+columns = 16
 
 vect = np.arange(rows * columns)
 matriz = vect.reshape((rows,columns))
