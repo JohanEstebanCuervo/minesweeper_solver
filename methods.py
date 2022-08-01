@@ -25,6 +25,7 @@ class solver_mw():
         self.four = np.array([0, 0, 123]).astype('int')
         self.five = np.array([123, 0, 0]).astype('int')
         self.six = np.array([0, 123, 123]).astype('int')
+        self.seven = np.array([0, 0, 0]).astype('int')
         self.empty = np.array([123, 123, 123]).astype('int')
 
     def InitGame(self, tim, browser='chrome'):
@@ -275,6 +276,13 @@ class solver_mw():
                     delete.append(cell)
                     break
 
+                if np.array_equal(self.seven, rect_list[index, :]):
+
+                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 7
+                    self.Active_cells.append(cell)
+                    delete.append(cell)
+                    break
+
                 if np.array_equal(self.empty, rect_list[index, :]):
 
                     break
@@ -346,7 +354,7 @@ class solver_mw():
         booms = list(set(booms))
         return free_booms, booms
 
-    def CalculateNeigt(self, Cell, cant = 'All'):
+    def CalculateNeigt(self, Cell, cant='All'):
         Neighbours = []
         Remove = []
         Neighbours.append(Cell - self.columns - 1)
@@ -416,7 +424,7 @@ class solver_mw():
                     Num_Booms += 1
 
             Val = self.Logic_Matrix[Cell // self.columns, Cell % self.columns] - Num_Booms
-            Dif = Num_emptys - (Val + Num_Booms)
+
             for empty in emptys:
                 emptys_sum[empty] = Val
 
@@ -447,7 +455,6 @@ class solver_mw():
                         Num_Booms2 += 1
 
                 Val2 = self.Logic_Matrix[Cell2 // self.columns, Cell2 % self.columns] - Num_Booms2
-                Dif2 = Num_emptys2 - (Val2 + Num_Booms2)
 
                 for empty in emptys2:
 
@@ -461,12 +468,12 @@ class solver_mw():
                 minimum = min(sumas.values())
                 valores = list(np.array(list(sumas.values())))
                 claves = list(sumas.keys())
+                if (len(sumas) == Num_emptys or len(sumas) == Num_emptys2) and Num_emptys2 != Num_emptys and Val + Val2 == 2:
+                    indexs = np.where(valores == minimum)[0]
+                    for index in indexs:
+                        free_booms.append(claves[index])
 
                 if len(sumas) == 3 and valores.count(minimum) == 1:
-
-                    if Val + Val2 == 2:
-                        index = valores.index(minimum)
-                        free_booms.append(claves[index])
 
                     if Val + Val2 == 3:
                         index = valores.index(minimum)
