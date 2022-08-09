@@ -28,6 +28,16 @@ class solver_mw():
         self.seven = np.array([0, 0, 0]).astype('int')
         self.empty = np.array([123, 123, 123]).astype('int')
 
+        self.Logic = {}
+        for Cell in range(self.Num_Cells):
+            Neighbours = self.CalculateNeigt(Cell)
+            self.Logic[Cell] = {}
+            self.Logic[Cell]['emptys_neighbors'] = Neighbours.copy()
+            self.Logic[Cell]['neighbors'] = Neighbours.copy()
+            self.Logic[Cell]['emptys'] = len(Neighbours)
+            self.Logic[Cell]['val'] = -1
+            self.Logic[Cell]['booms'] = 0
+
     def InitGame(self, tim, browser='chrome'):
 
         # Open the browser and charge buscaminas.eu
@@ -137,7 +147,7 @@ class solver_mw():
 
             self.ventana = np.array([y, x, h, w])
             return 0
-        else: 
+        else:
             print('Ventanas equiv:', len(ventana))
         return 1
 
@@ -220,13 +230,15 @@ class solver_mw():
             pyautogui.moveTo(int(point[0]), int(point[1]), tim)
             pyautogui.click(button=button)
 
-    def RefreshGame(self):
-
+    def RefreshGame(self, free_booms):
+        free = free_booms.copy()
         juego = np.array(pyautogui.screenshot(region=self.ventana))
 
-        delete = []
         pixels = self.size_cell**2
-        for cell in self.Cell_unknown:
+        for cell in free:
+            if not(cell in self.Cell_unknown):
+                continue
+
             inicix = int(self.points[cell, 1] - self.size_cell // 2)
             iniciy = int(self.points[cell, 0] - self.size_cell // 2)
             rect_cell = juego[inicix: inicix + self.size_cell, iniciy:iniciy + self.size_cell, :]
@@ -235,120 +247,91 @@ class solver_mw():
             for index in range(len(rect_list)):
 
                 if np.array_equal(self.one, rect_list[index, :]):
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 1
-                    self.Active_cells.append(cell)
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 1)
                     break
 
                 if np.array_equal(self.two, rect_list[index, :]):
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 2
-                    self.Active_cells.append(cell)
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 2)
                     break
 
                 if np.array_equal(self.three, rect_list[index, :]):
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 3
-                    self.Active_cells.append(cell)
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 3)
                     break
 
                 if np.array_equal(self.four, rect_list[index, :]):
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 4
-                    self.Active_cells.append(cell)
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 4)
                     break
 
                 if np.array_equal(self.five, rect_list[index, :]):
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 5
-                    self.Active_cells.append(cell)
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 5)
                     break
 
                 if np.array_equal(self.six, rect_list[index, :]):
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 6
-                    self.Active_cells.append(cell)
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 6)
                     break
 
                 if np.array_equal(self.seven, rect_list[index, :]):
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 7
-                    self.Active_cells.append(cell)
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 7)
                     break
 
                 if np.array_equal(self.empty, rect_list[index, :]):
-
+                    free = []
                     break
 
                 if index > pixels / 4:
-
-                    self.Logic_Matrix[cell // self.columns, cell % self.columns] = 0
-                    delete.append(cell)
+                    self.ActualiceNeighbour(cell, 0)
+                    free += self.Logic[cell]['emptys_neighbors']
                     break
 
-        for dele in delete:
-            self.Cell_unknown.remove(dele)
+    def ActualiceNeighbour(self, Cell, value):
+        self.Cell_unknown.remove(Cell)
+        self.Logic[Cell]['val'] = value
+        if value != 0:
+            self.Active_cells.append(Cell)
+
+        for Neighbour in self.Logic[Cell]['neighbors']:
+            self.Logic[Neighbour]['emptys'] -= 1
+            self.Logic[Neighbour]['emptys_neighbors'].remove(Cell)
+
+    def IsBoom(self, Cell):
+        self.booms -= 1
+        self.Cell_unknown.remove(Cell)
+        self.Logic[Cell]['val'] = 'X'
+
+        for Neighbour in self.Logic[Cell]['neighbors']:
+            self.Logic[Neighbour]['emptys'] -= 1
+            self.Logic[Neighbour]['booms'] += 1
+            self.Logic[Neighbour]['emptys_neighbors'].remove(Cell)
+
+    def SoluCell(self, Cell):
+        self.Active_cells.remove(Cell)
 
     def CalculateBooms(self):
 
         free_booms = []
         booms = []
-        Remove_act_cells = []
+        act_cells = self.Active_cells.copy()
+        for Cell in act_cells:
 
-        for Cell in self.Active_cells:
+            Dif = self.Logic[Cell]['val'] - self.Logic[Cell]['booms']
 
-            Neighbours = self.CalculateNeigt(Cell)
-
-            Num_Booms = 0
-            Num_emptys = 0
-            emptys = []
-            for Neighbour in Neighbours:
-                val = self.Logic_Matrix[Neighbour // self.columns, Neighbour % self.columns]
-                if val == -1:
-                    Num_emptys += 1
-                    emptys.append(Neighbour)
-
-                if val == -2:
-                    Num_Booms += 1
-
-            Dif = int(self.Logic_Matrix[Cell // self.columns, Cell % self.columns]) - Num_Booms
-
-            if Dif == Num_emptys:
-                Remove_act_cells.append(Cell)
+            if Dif == self.Logic[Cell]['emptys']:
+                self.SoluCell(Cell)
+                emptys = self.Logic[Cell]['emptys_neighbors'].copy()
                 for empty in emptys:
-                    if not(empty in self.Cell_unknown):
-                        print('error! celda:', empty)
-                        print(self.Logic_Matrix)
-                        sys.exit()
-
-                    self.Cell_unknown.remove(empty)
-                    self.Logic_Matrix[empty // self.columns, empty % self.columns] = -2
+                    self.IsBoom(empty)
                     booms.append(empty)
 
             elif Dif == 0:
-                Remove_act_cells.append(Cell)
-                for empty in emptys:
+                self.SoluCell(Cell)
+                for empty in self.Logic[Cell]['emptys_neighbors']:
                     free_booms.append(empty)
 
             elif Dif < 0:
                 print('Error en la solucion')
                 print('diferencia', Dif)
-                print('bombas', Num_Booms)
-                print('vacios', Num_emptys)
                 print('Celda', Cell)
-                print('Cantidad de vacios', len(emptys))
-                print(self.Logic_Matrix)
-                sys.exit()
-
-        for re in Remove_act_cells:
-            self.Active_cells.remove(re)
+                self.Solve_Act
 
         free_booms = list(set(free_booms))
         booms = list(set(booms))
@@ -407,32 +390,15 @@ class solver_mw():
         booms = []
 
         for Cell in self.Active_cells:
-
-            Neighbours = self.CalculateNeigt(Cell)
-
-            Num_Booms = 0
-            Num_emptys = 0
-            emptys = []
             emptys_sum = {}
-            for Neighbour in Neighbours:
-                val = self.Logic_Matrix[Neighbour // self.columns, Neighbour % self.columns]
-                if val == -1:
-                    Num_emptys += 1
-                    emptys.append(Neighbour)
-
-                if val == -2:
-                    Num_Booms += 1
-
-            Val = self.Logic_Matrix[Cell // self.columns, Cell % self.columns] - Num_Booms
-
-            for empty in emptys:
-                emptys_sum[empty] = Val
+            Dif = self.Logic[Cell]['val'] - self.Logic[Cell]['booms']
+            Num_emptys = self.Logic[Cell]['emptys']
+            for empty in self.Logic[Cell]['emptys_neighbors']:
+                emptys_sum[empty] = Dif
 
             Neighbours4 = self.CalculateNeigt(Cell, cant='rect')
             for Cell2 in Neighbours4:
                 sumas = emptys_sum.copy()
-                if self.Logic_Matrix[Cell2 // self.columns, Cell2 % self.columns] < 1:
-                    continue
 
                 if Cell2 < Cell:
                     continue
@@ -440,48 +406,36 @@ class solver_mw():
                 if not (Cell2 in self.Active_cells):
                     continue
 
-                Neighbours2 = self.CalculateNeigt(Cell2)
-                Num_Booms2 = 0
-                Num_emptys2 = 0
-                emptys2 = []
+                if self.Logic[Cell2]['val'] < 1:
+                    continue
 
-                for Neighbour in Neighbours2:
-                    val = self.Logic_Matrix[Neighbour // self.columns, Neighbour % self.columns]
-                    if val == -1:
-                        Num_emptys2 += 1
-                        emptys2.append(Neighbour)
+                Dif2 = self.Logic[Cell2]['val'] - self.Logic[Cell2]['booms']
 
-                    if val == -2:
-                        Num_Booms2 += 1
+                for empty in self.Logic[Cell2]['emptys_neighbors']:
 
-                Val2 = self.Logic_Matrix[Cell2 // self.columns, Cell2 % self.columns] - Num_Booms2
-
-                for empty in emptys2:
-
-                    if empty in emptys:
-                        sumas[empty] += Val2
-
+                    if empty in list(sumas.keys()):
+                        sumas[empty] += Dif2
                     else:
-
-                        sumas[empty] = Val2
+                        sumas[empty] = Dif2
 
                 minimum = min(sumas.values())
-                valores = list(np.array(list(sumas.values())))
+                valores = list(sumas.values())
                 claves = list(sumas.keys())
-                if (len(sumas) == Num_emptys or len(sumas) == Num_emptys2) and Num_emptys2 != Num_emptys and Val + Val2 == 2:
-                    indexs = np.where(valores == minimum)[0]
+                Num_emptys2 = self.Logic[Cell2]['emptys']
+
+                if (len(sumas) == Num_emptys or len(sumas) == Num_emptys2) and Num_emptys2 != Num_emptys and Dif + Dif2 == 2:
+                    indexs = np.where(np.array(valores) == minimum)[0]
                     for index in indexs:
                         free_booms.append(claves[index])
 
-                if len(sumas) == 3 and valores.count(minimum) == 1:
+                elif len(sumas) == 3 and valores.count(minimum) == 1 and Dif + Dif2 == 3:
 
-                    if Val + Val2 == 3:
-                        index = valores.index(minimum)
-                        booms.append(claves[index])
+                    index = valores.index(minimum)
+                    booms.append(claves[index])
 
-                if len(sumas) == 4 and valores.count(minimum) == 1 and valores.count(minimum + 1) == 1:
+                elif len(sumas) == 4 and valores.count(minimum) == 1 and valores.count(minimum + 1) == 1:
 
-                    if Val + Val2 == 3:
+                    if Dif + Dif2 == 3:
                         index = valores.index(minimum)
                         free_booms.append(claves[index])
 
@@ -490,22 +444,12 @@ class solver_mw():
 
         free_booms = list(set(free_booms))
         booms = list(set(booms))
-        booms_quit = []
-        for boom in booms:
-            if boom in free_booms:
-                print('error!')
-                booms_quit.append(boom)
-
-        for boom in booms_quit:
-            booms.remove(boom)
-
         for Cell in booms:
             if not (Cell in self.Cell_unknown):
                 print('error al calcular: ', Cell)
-                sys.exit()
+                self.Solve_Act
 
-            self.Logic_Matrix[Cell // self.columns, Cell % self.columns] = -2
-            self.Cell_unknown.remove(Cell)
+            self.IsBoom(Cell)
 
         return free_booms, booms
 
@@ -522,25 +466,25 @@ class solver_mw():
         cell_init = int(np.random.random() * self.Num_Cells)
         self.ClickCells([cell_init])
 
-        dif = True
+        self.Solve_Act = True
         max_rand = 10
         free = [cell_init]
-        while dif:
+        while self.Solve_Act:
             Actualice_ok = False
             Attemp = 0
             while not Actualice_ok and Attemp < 10:
                 Actualice_ok = True
                 Attemp += 1
-                self.RefreshGame()
-                for point_free in free:
-                    if point_free in self.Cell_unknown:
+                self.RefreshGame(free)
+                for cell in free:
+                    if cell in self.Cell_unknown:
                         Actualice_ok = False
                         continue
 
             if Attemp == 10 and not Actualice_ok:
 
                 print('No fue posible actualizar los valores del juego')
-                sys.exit()
+                break
 
             free, booms = self.CalculateBooms()
 
@@ -551,7 +495,13 @@ class solver_mw():
             if booms:
                 self.ClickCells(booms, button='right')
 
-            if np.array_equal(self.Logic_Matrix_After, self.Logic_Matrix) and not free and not booms:
+            if not self.Cell_unknown:
+
+                print('JUEGO TERMINADO :)')
+                self.Solve_Act = False
+
+            if not free and not booms and self.Cell_unknown:
+
                 free, booms = self.advance_methods()
                 if free:
                     print('libres advance:')
@@ -562,14 +512,12 @@ class solver_mw():
                     print('Bombas Advance')
                     self.ClickCells(booms, button='right')
                     print(booms)
-                if free or booms:
-                    pass #print(self.Logic_Matrix_After)
+
                 if not free and not booms:
                     max_rand -= 1
                     if not self.random or max_rand < 1:
                         print('No se encontro solución')
-                        print(self.Cell_unknown)
-                        dif = False
+                        self.Solve_Act = False
 
                     else:
                         rand = int(np.random.random() * len(self.Cell_unknown))
@@ -577,20 +525,14 @@ class solver_mw():
                         self.ClickCells(free)
                         print('Aleatorio!')
 
-            if not self.Cell_unknown:
-
-                print('JUEGO TERMINADO :)')
-                dif = False
-
+        for Cell in range(self.Num_Cells):
+            if self.Logic[Cell]['val'] == -1:
+                print(" ", end=" ")
             else:
+                print(self.Logic[Cell]['val'], end=" ")
+            if (Cell + 1) % self.columns == 0:
+                print(" ")
 
-                self.Logic_Matrix_After = np.copy(self.Logic_Matrix)
-
-        if not self.random and self.rows == 8:
-
-            print('Ultima Matriz')
-            print(self.Logic_Matrix)
-            print('Celdas desconocidas')
-            print(self.Cell_unknown)
-            print('Celdas Activas')
-            print(self.Active_cells)
+        for Cell in self.Active_cells:
+            print('Celda:', Cell, self.Logic[Cell]['val'], end=" ")
+            print(self.Logic[Cell]['emptys'])
