@@ -7,19 +7,22 @@ import os
 print('espera')
 time.sleep(3)
 print('inicia')
-
-for i in range(20):
+sol = 0
+iterations = 10
+for i in range(iterations):
     solver = solver_mw(difficulty='expert', random=True)
     #  solver.InitGame(tim=5, browser='chrome')
     solver.solve()
 
     if not solver.Cell_unknown:
-        time.sleep(13)
-        os.system('cls')
-        pyautogui.press('F2')
-        time.sleep(2)
+        sol +=1
+        pyautogui.moveTo(960, 5)
+        pyautogui.click()
 
-    else:
-        os.system('cls')
-        pyautogui.press('F2')
-        time.sleep(2)
+    os.system('cls')
+    pyautogui.press('F2')
+    time.sleep(0.5)
+
+    print(sol)
+
+print(sol/iterations)

@@ -1,5 +1,8 @@
-# Johan Esteban Cuervo Chica.
+"""
+Objeto que resuelve el juego buscaminas. 
 
+programmed by Johan Esteban Cuervo Chica
+"""
 import cv2
 import numpy as np
 import pyautogui
@@ -8,8 +11,13 @@ import sys
 
 
 class solver_mw():
+    """
+    Clase que resuelve el buscaminas clasico de la pagina 
+    https://buscaminas.eu/
 
-    def __init__(self, difficulty='beginner', random=False):
+    Puede iniciar automaticamente el navegador e iniciar el juego
+    """
+    def __init__(self, difficulty='beginner', random=False, sleep=0.1):
 
         self.CalculateRowsCol(difficulty)
 
@@ -18,15 +26,11 @@ class solver_mw():
         self.Cell_unknown = list(range(self.Num_Cells))
         self.Active_cells = []
         self.random = random
+        self.sleep = sleep
         self.imshow = False
-        self.one = np.array([0, 0, 255]).astype('int')
-        self.two = np.array([0, 123, 0]).astype('int')
-        self.three = np.array([255, 0, 0]).astype('int')
-        self.four = np.array([0, 0, 123]).astype('int')
-        self.five = np.array([123, 0, 0]).astype('int')
-        self.six = np.array([0, 123, 123]).astype('int')
-        self.seven = np.array([0, 0, 0]).astype('int')
-        self.empty = np.array([123, 123, 123]).astype('int')
+        self.numbers = np.array([[0, 0, 255], [0, 123, 0],
+                                 [255, 0, 0], [0, 0, 123], [123, 0, 0],
+                                 [0, 123, 123], [0, 0, 0]]).astype('int')
 
         self.Logic = {}
         for Cell in range(self.Num_Cells):
@@ -230,11 +234,40 @@ class solver_mw():
             pyautogui.moveTo(int(point[0]), int(point[1]), tim)
             pyautogui.click(button=button)
 
+    def calculate_cell(self, cell_pixels: np) -> int:
+        """
+        Esta función calcula el número de una celda enviada
+        """
+        black = False
+        white = False
+        pixels = self.size_cell**2
+        rect_list = cell_pixels.reshape((-1, 3))  # Num_pixeles * 3 RGB
+
+        sum_rec = np.sum(rect_list, axis=1)
+        if list(np.where(sum_rec==0)[0]):
+            black = True
+        if list(np.where(sum_rec>=735)[0]):
+            white = True
+
+        if white and black:
+            raise ChildProcessError('Juego Perdido')
+
+        if white and not black:
+            return
+
+        for index in range(len(rect_list)):
+            equal = np.where(np.sum(np.abs(self.numbers - rect_list[index, :]), axis=1) == 0)[0]
+
+            if len(equal):
+                return equal[0] + 1
+
+            if index > pixels / 4:
+                return 0
+
     def RefreshGame(self, free_booms):
         free = free_booms.copy()
         juego = np.array(pyautogui.screenshot(region=self.ventana))
 
-        pixels = self.size_cell**2
         for cell in free:
             if not(cell in self.Cell_unknown):
                 continue
@@ -242,46 +275,14 @@ class solver_mw():
             inicix = int(self.points[cell, 1] - self.size_cell // 2)
             iniciy = int(self.points[cell, 0] - self.size_cell // 2)
             rect_cell = juego[inicix: inicix + self.size_cell, iniciy:iniciy + self.size_cell, :]
-            rect_list = rect_cell.reshape((-1, 3))  # Num_pixeles * 3 RGB
 
-            for index in range(len(rect_list)):
-
-                if np.array_equal(self.one, rect_list[index, :]):
-                    self.ActualiceNeighbour(cell, 1)
-                    break
-
-                if np.array_equal(self.two, rect_list[index, :]):
-                    self.ActualiceNeighbour(cell, 2)
-                    break
-
-                if np.array_equal(self.three, rect_list[index, :]):
-                    self.ActualiceNeighbour(cell, 3)
-                    break
-
-                if np.array_equal(self.four, rect_list[index, :]):
-                    self.ActualiceNeighbour(cell, 4)
-                    break
-
-                if np.array_equal(self.five, rect_list[index, :]):
-                    self.ActualiceNeighbour(cell, 5)
-                    break
-
-                if np.array_equal(self.six, rect_list[index, :]):
-                    self.ActualiceNeighbour(cell, 6)
-                    break
-
-                if np.array_equal(self.seven, rect_list[index, :]):
-                    self.ActualiceNeighbour(cell, 7)
-                    break
-
-                if np.array_equal(self.empty, rect_list[index, :]):
-                    free = []
-                    break
-
-                if index > pixels / 4:
-                    self.ActualiceNeighbour(cell, 0)
-                    free += self.Logic[cell]['emptys_neighbors']
-                    break
+            num = self.calculate_cell(rect_cell)
+            if num is None:
+                continue
+                    
+            self.ActualiceNeighbour(cell, num)
+            if num == 0:
+                free += self.Logic[cell]['emptys_neighbors']
 
     def ActualiceNeighbour(self, Cell, value):
         self.Cell_unknown.remove(Cell)
@@ -303,9 +304,6 @@ class solver_mw():
             self.Logic[Neighbour]['booms'] += 1
             self.Logic[Neighbour]['emptys_neighbors'].remove(Cell)
 
-    def SoluCell(self, Cell):
-        self.Active_cells.remove(Cell)
-
     def CalculateBooms(self):
 
         free_booms = []
@@ -316,14 +314,14 @@ class solver_mw():
             Dif = self.Logic[Cell]['val'] - self.Logic[Cell]['booms']
 
             if Dif == self.Logic[Cell]['emptys']:
-                self.SoluCell(Cell)
+                self.Active_cells.remove(Cell)
                 emptys = self.Logic[Cell]['emptys_neighbors'].copy()
                 for empty in emptys:
                     self.IsBoom(empty)
                     booms.append(empty)
 
             elif Dif == 0:
-                self.SoluCell(Cell)
+                self.Active_cells.remove(Cell)
                 for empty in self.Logic[Cell]['emptys_neighbors']:
                     free_booms.append(empty)
 
@@ -469,62 +467,69 @@ class solver_mw():
         self.Solve_Act = True
         max_rand = 10
         free = [cell_init]
-        while self.Solve_Act:
-            Actualice_ok = False
-            Attemp = 0
-            while not Actualice_ok and Attemp < 10:
-                Actualice_ok = True
-                Attemp += 1
-                self.RefreshGame(free)
-                for cell in free:
-                    if cell in self.Cell_unknown:
-                        Actualice_ok = False
-                        continue
+        try:
+            while self.Solve_Act:
+                Actualice_ok = False
+                Attemp = 0
+                while not Actualice_ok and Attemp < 10:
+                    Actualice_ok = True
+                    Attemp += 1
+                    self.RefreshGame(free)
+                    for cell in free:
+                        if cell in self.Cell_unknown:
+                            Actualice_ok = False
+                            continue
 
-            if Attemp == 10 and not Actualice_ok:
+                if Attemp == 10 and not Actualice_ok:
 
-                print('No fue posible actualizar los valores del juego')
-                break
+                    print('No fue posible actualizar los valores del juego')
+                    break
 
-            free, booms = self.CalculateBooms()
+                free, booms = self.CalculateBooms()
 
-            if free:
-                self.ClickCells(free)
-                print(free)
-
-            if booms:
-                self.ClickCells(booms, button='right')
-
-            if not self.Cell_unknown:
-
-                print('JUEGO TERMINADO :)')
-                self.Solve_Act = False
-
-            if not free and not booms and self.Cell_unknown:
-
-                free, booms = self.advance_methods()
                 if free:
-                    print('libres advance:')
                     self.ClickCells(free)
                     print(free)
 
                 if booms:
-                    print('Bombas Advance')
                     self.ClickCells(booms, button='right')
-                    print(booms)
 
-                if not free and not booms:
-                    max_rand -= 1
-                    if not self.random or max_rand < 1:
-                        print('No se encontro solución')
-                        self.Solve_Act = False
+                if not self.Cell_unknown:
 
-                    else:
-                        rand = int(np.random.random() * len(self.Cell_unknown))
-                        free.append(self.Cell_unknown[rand])
+                    print('JUEGO TERMINADO :)')
+                    self.Solve_Act = False
+
+                if not free and not booms and self.Cell_unknown:
+
+                    free, booms = self.advance_methods()
+                    if free:
+                        print('libres advance:')
                         self.ClickCells(free)
-                        print('Aleatorio!')
+                        print(free)
 
+                    if booms:
+                        print('Bombas Advance')
+                        self.ClickCells(booms, button='right')
+                        print(booms)
+
+                    if not free and not booms:
+                        max_rand -= 1
+                        if not self.random or max_rand < 1:
+                            print('No se encontro solución')
+                            self.Solve_Act = False
+
+                        else:
+                            rand = int(np.random.random() * len(self.Cell_unknown))
+                            free.append(self.Cell_unknown[rand])
+                            self.ClickCells(free)
+                            print('Aleatorio!')
+
+            self.print_game()
+
+        except ChildProcessError as error:
+            print(error)
+
+    def print_game(self):
         for Cell in range(self.Num_Cells):
             if self.Logic[Cell]['val'] == -1:
                 print(" ", end=" ")
@@ -532,7 +537,3 @@ class solver_mw():
                 print(self.Logic[Cell]['val'], end=" ")
             if (Cell + 1) % self.columns == 0:
                 print(" ")
-
-        for Cell in self.Active_cells:
-            print('Celda:', Cell, self.Logic[Cell]['val'], end=" ")
-            print(self.Logic[Cell]['emptys'])
