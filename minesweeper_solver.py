@@ -10,7 +10,7 @@ import time
 import sys
 
 
-class solver_mw():
+class MinesWeeperSolver():
     """
     Clase que resuelve el buscaminas clasico de la pagina 
     https://buscaminas.eu/

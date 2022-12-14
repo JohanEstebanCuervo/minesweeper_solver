@@ -1,16 +1,17 @@
 # Johan Esteban Cuervo Chica
-from methods import *
 import time
 import pyautogui
 import os
+from minesweeper_solver import MinesWeeperSolver
+
 
 print('espera')
-time.sleep(3)
+time.sleep(2)
 print('inicia')
 sol = 0
 iterations = 10
 for i in range(iterations):
-    solver = solver_mw(difficulty='expert', random=True)
+    solver = MinesWeeperSolver(difficulty='expert', random=True)
     #  solver.InitGame(tim=5, browser='chrome')
     solver.solve()
 
