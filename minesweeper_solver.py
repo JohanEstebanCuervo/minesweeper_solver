@@ -1,30 +1,30 @@
 """
-Objeto que resuelve el juego buscaminas. 
+Objeto que resuelve el juego buscaminas.
 
 programmed by Johan Esteban Cuervo Chica
 """
+
+import sys
+import time
 import cv2
 import numpy as np
 import pyautogui
-import time
-import sys
-
 
 class MinesWeeperSolver():
     """
-    Clase que resuelve el buscaminas clasico de la pagina 
+    Clase que resuelve el buscaminas clasico de la pagina cell_unknown
     https://buscaminas.eu/
 
     Puede iniciar automaticamente el navegador e iniciar el juego
     """
     def __init__(self, difficulty='beginner', random=False, sleep=0.1):
 
-        self.CalculateRowsCol(difficulty)
+        self.calculate_rowcol(difficulty)
 
-        self.Logic_Matrix = np.ones((self.rows, self.columns)).astype('int') * (-1)  # -1 sin información
-        self.Logic_Matrix_After = np.copy(self.Logic_Matrix)
-        self.Cell_unknown = list(range(self.Num_Cells))
-        self.Active_cells = []
+        self.logicmatrix = np.ones((self.rows, self.columns)).astype('int')*(-1)  # -1 sin información
+        self.logicmatrix_After = np.copy(self.logicmatrix)
+        self.cell_unknown = list(range(self.num_cells))
+        self.active_cells = []
         self.random = random
         self.sleep = sleep
         self.imshow = False
@@ -33,7 +33,7 @@ class MinesWeeperSolver():
                                  [0, 123, 123], [0, 0, 0]]).astype('int')
 
         self.Logic = {}
-        for Cell in range(self.Num_Cells):
+        for Cell in range(self.num_cells):
             Neighbours = self.CalculateNeigt(Cell)
             self.Logic[Cell] = {}
             self.Logic[Cell]['emptys_neighbors'] = Neighbours.copy()
@@ -42,10 +42,14 @@ class MinesWeeperSolver():
             self.Logic[Cell]['val'] = -1
             self.Logic[Cell]['booms'] = 0
 
-    def InitGame(self, tim, browser='chrome'):
-
-        # Open the browser and charge buscaminas.eu
-        # Tim -> time sleep for each action, depends on the internet and computer
+    def init_game(self, tim: float= 0.1, browser:str='chrome') -> None:
+        """
+        Open the browser and charge buscaminas.eu
+        Args:
+            tim (float, optional): time sleep for each action, depends on the 
+                                   internet and computer. Defaults to 0.1.
+            browser (str, optional): Name navigator. Defaults to 'chrome'.
+        """
         pyautogui.press('win')
         time.sleep(tim / 2)
         pyautogui.write(browser)
@@ -62,8 +66,17 @@ class MinesWeeperSolver():
         pyautogui.press('enter')
         time.sleep(tim)
 
-    def CalculateRowsCol(self, difficulty):
+    def calculate_rowcol(self, difficulty: str) -> None:
+        """
+        Calculate the number rows, columns, cells
+        according to the given difficulty
 
+        Args:
+            difficulty (str): (beginner, intermediate, expert)
+
+        Raises:
+            ChildProcessError: Non-existent option
+        """
         if difficulty == 'beginner':
             self.rows = 8
             self.columns = 8
@@ -87,10 +100,9 @@ class MinesWeeperSolver():
 
         else:
 
-            print('Dificultad no Validad')
-            sys.exit()
+            raise ChildProcessError(f'Dificultad no Validad: {difficulty}')
 
-        self.Num_Cells = self.rows * self.columns
+        self.num_cells = self.rows * self.columns
 
     def FindWindow(self):
         image = np.array(pyautogui.screenshot())
@@ -188,7 +200,7 @@ class MinesWeeperSolver():
 
         moda = np.median(tams)
 
-        if len(squares) > self.Num_Cells:
+        if len(squares) > self.num_cells:
             squares_mode = []
             points_mode = []
             for iterator in range(len(squares)):
@@ -205,7 +217,7 @@ class MinesWeeperSolver():
                 cv2.imshow('outlines', game_2)
                 cv2.waitKey(0)
 
-        if len(squares) == self.Num_Cells:
+        if len(squares) == self.num_cells:
             points = np.array(points)
             points += int(moda // 2)  # Num_celd * 2
 
@@ -223,7 +235,7 @@ class MinesWeeperSolver():
             return 0
 
         else:
-            print('Se encontraron:', len(squares), 'Cuadros de:', self.Num_Cells)
+            print('Se encontraron:', len(squares), 'Cuadros de:', self.num_cells)
 
         return 1
 
@@ -269,7 +281,7 @@ class MinesWeeperSolver():
         juego = np.array(pyautogui.screenshot(region=self.ventana))
 
         for cell in free:
-            if not(cell in self.Cell_unknown):
+            if not(cell in self.cell_unknown):
                 continue
 
             inicix = int(self.points[cell, 1] - self.size_cell // 2)
@@ -285,10 +297,10 @@ class MinesWeeperSolver():
                 free += self.Logic[cell]['emptys_neighbors']
 
     def ActualiceNeighbour(self, Cell, value):
-        self.Cell_unknown.remove(Cell)
+        self.cell_unknown.remove(Cell)
         self.Logic[Cell]['val'] = value
         if value != 0:
-            self.Active_cells.append(Cell)
+            self.active_cells.append(Cell)
 
         for Neighbour in self.Logic[Cell]['neighbors']:
             self.Logic[Neighbour]['emptys'] -= 1
@@ -296,7 +308,7 @@ class MinesWeeperSolver():
 
     def IsBoom(self, Cell):
         self.booms -= 1
-        self.Cell_unknown.remove(Cell)
+        self.cell_unknown.remove(Cell)
         self.Logic[Cell]['val'] = 'X'
 
         for Neighbour in self.Logic[Cell]['neighbors']:
@@ -308,20 +320,20 @@ class MinesWeeperSolver():
 
         free_booms = []
         booms = []
-        act_cells = self.Active_cells.copy()
+        act_cells = self.active_cells.copy()
         for Cell in act_cells:
 
             Dif = self.Logic[Cell]['val'] - self.Logic[Cell]['booms']
 
             if Dif == self.Logic[Cell]['emptys']:
-                self.Active_cells.remove(Cell)
+                self.active_cells.remove(Cell)
                 emptys = self.Logic[Cell]['emptys_neighbors'].copy()
                 for empty in emptys:
                     self.IsBoom(empty)
                     booms.append(empty)
 
             elif Dif == 0:
-                self.Active_cells.remove(Cell)
+                self.active_cells.remove(Cell)
                 for empty in self.Logic[Cell]['emptys_neighbors']:
                     free_booms.append(empty)
 
@@ -363,7 +375,7 @@ class MinesWeeperSolver():
             Remove.append(Cell - self.columns)
             Remove.append(Cell - self.columns + 1)
 
-        if Cell + self.columns > self.Num_Cells - 1:
+        if Cell + self.columns > self.num_cells - 1:
             Remove.append(Cell + self.columns - 1)
             Remove.append(Cell + self.columns)
             Remove.append(Cell + self.columns + 1)
@@ -387,7 +399,7 @@ class MinesWeeperSolver():
         free_booms = []
         booms = []
 
-        for Cell in self.Active_cells:
+        for Cell in self.active_cells:
             emptys_sum = {}
             Dif = self.Logic[Cell]['val'] - self.Logic[Cell]['booms']
             Num_emptys = self.Logic[Cell]['emptys']
@@ -401,7 +413,7 @@ class MinesWeeperSolver():
                 if Cell2 < Cell:
                     continue
 
-                if not (Cell2 in self.Active_cells):
+                if not (Cell2 in self.active_cells):
                     continue
 
                 if self.Logic[Cell2]['val'] < 1:
@@ -443,7 +455,7 @@ class MinesWeeperSolver():
         free_booms = list(set(free_booms))
         booms = list(set(booms))
         for Cell in booms:
-            if not (Cell in self.Cell_unknown):
+            if not (Cell in self.cell_unknown):
                 print('error al calcular: ', Cell)
                 self.Solve_Act
 
@@ -461,7 +473,7 @@ class MinesWeeperSolver():
             print('Fallo al encontrar la cuadricula del juego')
             sys.exit()
 
-        cell_init = int(np.random.random() * self.Num_Cells)
+        cell_init = int(np.random.random() * self.num_cells)
         self.ClickCells([cell_init])
 
         self.Solve_Act = True
@@ -476,7 +488,7 @@ class MinesWeeperSolver():
                     Attemp += 1
                     self.RefreshGame(free)
                     for cell in free:
-                        if cell in self.Cell_unknown:
+                        if cell in self.cell_unknown:
                             Actualice_ok = False
                             continue
 
@@ -494,12 +506,12 @@ class MinesWeeperSolver():
                 if booms:
                     self.ClickCells(booms, button='right')
 
-                if not self.Cell_unknown:
+                if not self.cell_unknown:
 
                     print('JUEGO TERMINADO :)')
                     self.Solve_Act = False
 
-                if not free and not booms and self.Cell_unknown:
+                if not free and not booms and self.cell_unknown:
 
                     free, booms = self.advance_methods()
                     if free:
@@ -519,8 +531,8 @@ class MinesWeeperSolver():
                             self.Solve_Act = False
 
                         else:
-                            rand = int(np.random.random() * len(self.Cell_unknown))
-                            free.append(self.Cell_unknown[rand])
+                            rand = int(np.random.random() * len(self.cell_unknown))
+                            free.append(self.cell_unknown[rand])
                             self.ClickCells(free)
                             print('Aleatorio!')
 
@@ -530,7 +542,7 @@ class MinesWeeperSolver():
             print(error)
 
     def print_game(self):
-        for Cell in range(self.Num_Cells):
+        for Cell in range(self.num_cells):
             if self.Logic[Cell]['val'] == -1:
                 print(" ", end=" ")
             else:
