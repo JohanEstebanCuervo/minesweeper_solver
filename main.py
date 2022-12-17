@@ -9,9 +9,9 @@ print('espera')
 time.sleep(2)
 print('inicia')
 sol = 0
-iterations = 16
+iterations = 3
 for i in range(iterations):
-    solver = MinesWeeperSolver(difficulty='expert', random=True)
+    solver = MinesWeeperSolver(difficulty='expert', random=False)
     #  solver.InitGame(tim=5, browser='chrome')
     solver.solve()
 

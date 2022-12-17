@@ -4,49 +4,51 @@ Objeto que resuelve el juego buscaminas.
 programmed by Johan Esteban Cuervo Chica
 """
 
-import sys
 import time
-import cv2
+from cv2 import cv2
 import numpy as np
 import pyautogui
 
 class MinesWeeperSolver():
     """
-    Clase que resuelve el buscaminas clasico de la pagina cell_unknown
-    https://buscaminas.eu/
+    Class that solves the classic minesweeper of the cell_unknown page
+    https://minbusweeper.eu/
 
-    Puede iniciar automaticamente el navegador e iniciar el juego
+    You can automatically start the browser and start the game
     """
-    def __init__(self, difficulty='beginner', random=False, sleep=0.1):
+    def __init__(self, difficulty='beginner', random=False, sleep=0.1) -> None:
 
         self.calculate_rowcol(difficulty)
 
-        self.logicmatrix = np.ones((self.rows, self.columns)).astype('int')*(-1)  # -1 sin información
-        self.logicmatrix_After = np.copy(self.logicmatrix)
+        self.logicmatrix = np.ones((self.rows, self.columns)).astype('int')*(-1)
+        self.logicmatrix_after = np.copy(self.logicmatrix)
         self.cell_unknown = list(range(self.num_cells))
         self.active_cells = []
         self.random = random
+        self.window = None
+        self.points = None
+        self.size_cell = None
         self.sleep = sleep
         self.imshow = False
         self.numbers = np.array([[0, 0, 255], [0, 123, 0],
                                  [255, 0, 0], [0, 0, 123], [123, 0, 0],
                                  [0, 123, 123], [0, 0, 0]]).astype('int')
 
-        self.Logic = {}
-        for Cell in range(self.num_cells):
-            Neighbours = self.CalculateNeigt(Cell)
-            self.Logic[Cell] = {}
-            self.Logic[Cell]['emptys_neighbors'] = Neighbours.copy()
-            self.Logic[Cell]['neighbors'] = Neighbours.copy()
-            self.Logic[Cell]['emptys'] = len(Neighbours)
-            self.Logic[Cell]['val'] = -1
-            self.Logic[Cell]['booms'] = 0
+        self.logic = {}
+        for cell in range(self.num_cells):
+            neighbours = self.calculate_neighbor(cell)
+            self.logic[cell] = {}
+            self.logic[cell]['emptys_neighbors'] = neighbours.copy()
+            self.logic[cell]['neighbors'] = neighbours.copy()
+            self.logic[cell]['emptys'] = len(neighbours)
+            self.logic[cell]['val'] = -1
+            self.logic[cell]['booms'] = 0
 
     def init_game(self, tim: float= 0.1, browser:str='chrome') -> None:
         """
         Open the browser and charge buscaminas.eu
         Args:
-            tim (float, optional): time sleep for each action, depends on the 
+            tim (float, optional): time sleep for each action, depends on the
                                    internet and computer. Defaults to 0.1.
             browser (str, optional): Name navigator. Defaults to 'chrome'.
         """
@@ -104,7 +106,13 @@ class MinesWeeperSolver():
 
         self.num_cells = self.rows * self.columns
 
-    def FindWindow(self):
+    def find_window(self) -> bool:
+        """
+        Calculate the position of window the game
+
+        Returns:
+            bool: True on failure, False on success
+        """
         image = np.array(pyautogui.screenshot())
         image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -128,12 +136,11 @@ class MinesWeeperSolver():
             approx = cv2.approxPolyDP(contorno, 10, True)
             if len(approx) == 4:
 
-                h = (approx[1] - approx[0])[0][1]
-                w = (approx[2] - approx[0])[0][0]
-                # print(str(w) + ', ' + str(h))
+                height = (approx[1] - approx[0])[0][1]
+                width = (approx[2] - approx[0])[0][0]
 
-                if w != 0:
-                    relac = round(np.abs(h / w), 2)
+                if width != 0:
+                    relac = round(np.abs(height / width), 2)
                 else:
                     relac = 0
 
@@ -151,24 +158,30 @@ class MinesWeeperSolver():
 
             ventana = ventana[0]
 
-            y, x = ventana[0][0]
-            w = (ventana[1] - ventana[0])[0][1]
-            h = (ventana[2] - ventana[0])[0][0]
+            posy, posx = ventana[0][0]
+            width = (ventana[1] - ventana[0])[0][1]
+            height = (ventana[2] - ventana[0])[0][0]
 
             if self.imshow:
-                game = image_gray[x: x + w, y: y + h]
+                game = image_gray[posx: posx + width, posy: posy + height]
 
                 cv2.imshow('juego', game)
                 cv2.waitKey(0)
 
-            self.ventana = np.array([y, x, h, w])
-            return 0
+            self.window = np.array([posy, posx, height, width])
+            return False
         else:
             print('Ventanas equiv:', len(ventana))
-        return 1
+        return True
 
-    def FindMatrix(self):
-        game = np.array(pyautogui.screenshot(region=self.ventana))
+    def find_matrix(self) -> bool:
+        """
+        Calculate the position of cells the game
+
+        Returns:
+            bool: True on failure, False on success
+        """
+        game = np.array(pyautogui.screenshot(region=self.window))
         game_gray = cv2.cvtColor(game, cv2.COLOR_BGR2GRAY)
 
         _, game_bin = cv2.threshold(game_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -180,7 +193,8 @@ class MinesWeeperSolver():
         if self.imshow:
             game_1 = cv2.cvtColor(game, cv2.COLOR_RGB2BGR)
             contornos2 = list(outlines)
-            contornos2.append(np.array([[[0, 0]], [[0, 310]], [[310, 310]], [[310, 0]]]).astype('int32'))
+            contornos2.append(
+                np.array([[[0, 0]], [[0, 310]], [[310, 310]], [[310, 0]]]).astype('int32'))
             cv2.drawContours(game_1, contornos2, -1, (0, 0, 255), 2)
             cv2.imshow('outlines', game_1)
             cv2.waitKey(0)
@@ -189,13 +203,18 @@ class MinesWeeperSolver():
         points = []
         tams = []
         for contorno in outlines:
-            x, y, w, h = cv2.boundingRect(contorno)
-            relac = round(float(w) / h, 1)
+            posx, posy, width, height = cv2.boundingRect(contorno)
+            relac = round(float(width) / height, 1)
             if relac == 1.0:
-                axes = np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]]).astype('int32')
-                init = np.array([x, y]).astype('int')
+                axes = np.array([
+                    [posx, posy],
+                    [posx + width, posy],
+                    [posx + width, posy + height],
+                    [posx, posy + height]
+                    ]).astype('int32')
+                init = np.array([posx, posy]).astype('int')
                 points.append(init)
-                tams.append(w)
+                tams.append(width)
                 squares.append(axes)
 
         moda = np.median(tams)
@@ -203,10 +222,10 @@ class MinesWeeperSolver():
         if len(squares) > self.num_cells:
             squares_mode = []
             points_mode = []
-            for iterator in range(len(squares)):
+            for iterator, square in enumerate(squares):
 
                 if tams[iterator] < moda + 2 and tams[iterator] > moda - 2:
-                    squares_mode.append(squares[iterator])
+                    squares_mode.append(square)
                     points_mode.append(points[iterator])
 
             squares = squares_mode
@@ -232,23 +251,39 @@ class MinesWeeperSolver():
 
             self.points = points
             self.size_cell = int(moda) - 3
-            return 0
+            return False
 
         else:
             print('Se encontraron:', len(squares), 'Cuadros de:', self.num_cells)
 
-        return 1
+        return True
 
-    def ClickCells(self, indexs, button='left', tim=0.00):
+    def click_cells(self, indexs: list, button: str='left', tim: float=0.00) -> None:
+        """
+        click the given list of cells
 
+        Args:
+            indexs (list): list of cells
+            button (str, optional): (left, right). Defaults to 'left'.
+            tim (float, optional): time to move the pointer. Defaults to 0.00.
+        """
         for index in indexs:
-            point = self.points[index, :] + self.ventana[: 2]
+            point = self.points[index, :] + self.window[: 2]
             pyautogui.moveTo(int(point[0]), int(point[1]), tim)
             pyautogui.click(button=button)
 
-    def calculate_cell(self, cell_pixels: np) -> int:
+    def calculate_cell(self, cell_pixels: object) -> int:
         """
-        Esta función calcula el número de una celda enviada
+        calculates the number of a cell
+
+        Args:
+            cell_pixels (object): numpy.Array the dim (n,n,3)
+
+        Raises:
+            ChildProcessError: If the cell is Boom -> Game Over
+
+        Returns:
+            int: number in cell
         """
         black = False
         white = False
@@ -276,12 +311,19 @@ class MinesWeeperSolver():
             if index > pixels / 4:
                 return 0
 
-    def RefreshGame(self, free_booms):
+    def refresh_game(self, free_booms: list) -> None:
+        """
+        update the game given the cells free of bombs.
+        also updates the neighbors of the cells with 0 bombs
+
+        Args:
+            free_booms (list): list of cell free bombs
+        """
         free = free_booms.copy()
-        juego = np.array(pyautogui.screenshot(region=self.ventana))
+        juego = np.array(pyautogui.screenshot(region=self.window))
 
         for cell in free:
-            if not(cell in self.cell_unknown):
+            if cell not in self.cell_unknown:
                 continue
 
             inicix = int(self.points[cell, 1] - self.size_cell // 2)
@@ -291,249 +333,322 @@ class MinesWeeperSolver():
             num = self.calculate_cell(rect_cell)
             if num is None:
                 continue
-                    
-            self.ActualiceNeighbour(cell, num)
+
+            self.update_neighbours(cell, num)
             if num == 0:
-                free += self.Logic[cell]['emptys_neighbors']
+                free += self.logic[cell]['emptys_neighbors']
 
-    def ActualiceNeighbour(self, Cell, value):
-        self.cell_unknown.remove(Cell)
-        self.Logic[Cell]['val'] = value
+    def update_neighbours(self, cell: int, value: int)-> None:
+        """
+        update the neighbors of a discovered cell
+
+        Args:
+            cell (int): number of cell
+            value (int): number in cell
+        """
+        self.cell_unknown.remove(cell)
+        self.logic[cell]['val'] = value
         if value != 0:
-            self.active_cells.append(Cell)
+            self.active_cells.append(cell)
 
-        for Neighbour in self.Logic[Cell]['neighbors']:
-            self.Logic[Neighbour]['emptys'] -= 1
-            self.Logic[Neighbour]['emptys_neighbors'].remove(Cell)
+        for neighbour in self.logic[cell]['neighbors']:
+            self.logic[neighbour]['emptys'] -= 1
+            self.logic[neighbour]['emptys_neighbors'].remove(cell)
 
-    def IsBoom(self, Cell):
+    def is_boom(self, cell: int) -> None:
+        """
+        If a cell is a bomb,
+        it updates the information on the neighbors and changes their value to posx.
+
+        Args:
+            cell (int): number of cell
+        """
         self.booms -= 1
-        self.cell_unknown.remove(Cell)
-        self.Logic[Cell]['val'] = 'X'
+        self.cell_unknown.remove(cell)
+        self.logic[cell]['val'] = 'X'
 
-        for Neighbour in self.Logic[Cell]['neighbors']:
-            self.Logic[Neighbour]['emptys'] -= 1
-            self.Logic[Neighbour]['booms'] += 1
-            self.Logic[Neighbour]['emptys_neighbors'].remove(Cell)
+        for neighbour in self.logic[cell]['neighbors']:
+            self.logic[neighbour]['emptys'] -= 1
+            self.logic[neighbour]['booms'] += 1
+            self.logic[neighbour]['emptys_neighbors'].remove(cell)
 
-    def CalculateBooms(self):
+    def calculate_neighbor(self, cell: int, cant: str='all') -> list:
+        """
+        This function calculates the neighboring cells of a given cell.
 
+        all <- Return list all neighbours
+        rect <- Return non-diagonal neighbors
+
+        Args:
+            cell (int): number of cell
+            cant (str, optional): (all, rect). Defaults to 'all'.
+
+        Returns:
+            list: cells neighbours
+        """
+        neighbours = []
+        not_neighbours = []
+        neighbours.append(cell - self.columns - 1)
+        neighbours.append(cell - self.columns)
+        neighbours.append(cell - self.columns + 1)
+        neighbours.append(cell - 1)
+        neighbours.append(cell + 1)
+        neighbours.append(cell + self.columns - 1)
+        neighbours.append(cell + self.columns)
+        neighbours.append(cell + self.columns + 1)
+
+        if cell % self.columns == 0:
+
+            not_neighbours.append(cell - self.columns - 1)
+            not_neighbours.append(cell - 1)
+            not_neighbours.append(cell + self.columns - 1)
+
+        if (cell + 1) % self.columns == 0:
+            not_neighbours.append(cell - self.columns + 1)
+            not_neighbours.append(cell + 1)
+            not_neighbours.append(cell + self.columns + 1)
+
+        if cell - self.columns < 0:
+            not_neighbours.append(cell - self.columns - 1)
+            not_neighbours.append(cell - self.columns)
+            not_neighbours.append(cell - self.columns + 1)
+
+        if cell + self.columns > self.num_cells - 1:
+            not_neighbours.append(cell + self.columns - 1)
+            not_neighbours.append(cell + self.columns)
+            not_neighbours.append(cell + self.columns + 1)
+
+        if cant == 'rect':
+            not_neighbours.append(cell - self.columns - 1)
+            not_neighbours.append(cell - self.columns + 1)
+            not_neighbours.append(cell + self.columns - 1)
+            not_neighbours.append(cell + self.columns + 1)
+
+        not_neighbours = list(set(not_neighbours))
+
+        for remove in not_neighbours:
+
+            neighbours.remove(remove)
+
+        return neighbours
+
+    def difference_algorithm(self) -> tuple:
+        """
+        calculates the unknown cells by traversing the active cells
+        and calculating the difference between their value and the
+        number of empty neighbors. If it is the same, all the neighbors
+        are bombs. If it is 0, all the neighbors are not bombs and if
+        it is negative, there is an error in the solution.
+
+        Raises:
+            ChildProcessError: in case of inconsistency in the solution
+
+        Returns:
+            list: cells free bombs
+            list: cells bombs
+        """
         free_booms = []
         booms = []
         act_cells = self.active_cells.copy()
-        for Cell in act_cells:
+        for cell in act_cells:
 
-            Dif = self.Logic[Cell]['val'] - self.Logic[Cell]['booms']
+            dif = self.logic[cell]['val'] - self.logic[cell]['booms']
 
-            if Dif == self.Logic[Cell]['emptys']:
-                self.active_cells.remove(Cell)
-                emptys = self.Logic[Cell]['emptys_neighbors'].copy()
+            if dif == self.logic[cell]['emptys']:
+                self.active_cells.remove(cell)
+                emptys = self.logic[cell]['emptys_neighbors'].copy()
                 for empty in emptys:
-                    self.IsBoom(empty)
+                    self.is_boom(empty)
                     booms.append(empty)
 
-            elif Dif == 0:
-                self.active_cells.remove(Cell)
-                for empty in self.Logic[Cell]['emptys_neighbors']:
+            elif dif == 0:
+                self.active_cells.remove(cell)
+                for empty in self.logic[cell]['emptys_neighbors']:
                     free_booms.append(empty)
 
-            elif Dif < 0:
-                print('Error en la solucion')
-                print('diferencia', Dif)
-                print('Celda', Cell)
-                self.Solve_Act
+            elif dif < 0:
+                raise ChildProcessError(
+                    f"Error en la solución celda {cell}: valor: {self.logic[cell]['val']}" +
+                    f" , bombas: {self.logic[cell]['booms']}"
+                )
 
         free_booms = list(set(free_booms))
         booms = list(set(booms))
         return free_booms, booms
 
-    def CalculateNeigt(self, Cell, cant='All'):
-        Neighbours = []
-        Remove = []
-        Neighbours.append(Cell - self.columns - 1)
-        Neighbours.append(Cell - self.columns)
-        Neighbours.append(Cell - self.columns + 1)
-        Neighbours.append(Cell - 1)
-        Neighbours.append(Cell + 1)
-        Neighbours.append(Cell + self.columns - 1)
-        Neighbours.append(Cell + self.columns)
-        Neighbours.append(Cell + self.columns + 1)
+    def neighbor_algorithm(self) -> tuple:
+        """
+        This algorithm can only be used in case the difference algorithm does
+        not discover cells since otherwise it can generate a bug in the solution.
+        This algorithm takes the rectangular neighbors of the active cells and calculates
+        the difference between the cell value and the bombs by assigning it to a new dictionary.
 
-        if Cell % self.columns == 0:
+        Then perform the same procedure for neighboring cells.Based on the resulting dictionary,
+        it can be calculated that:
 
-            Remove.append(Cell - self.columns - 1)
-            Remove.append(Cell - 1)
-            Remove.append(Cell + self.columns - 1)
+        if one of the cells contains all the neighbors of the other. and each cell needs a bomb.
+        The cells that are not part of the intersection of neighbors are free of bombs.
 
-        if (Cell + 1) % self.columns == 0:
-            Remove.append(Cell - self.columns + 1)
-            Remove.append(Cell + 1)
-            Remove.append(Cell + self.columns + 1)
+        If you only have a list of 3 neighbors in the bombs, the minimum value of difference is 1
+        and the total sum of differences is 3, the cells with the minimum sum are bombs.
 
-        if Cell - self.columns < 0:
-            Remove.append(Cell - self.columns - 1)
-            Remove.append(Cell - self.columns)
-            Remove.append(Cell - self.columns + 1)
+        If the number of neighbors is 4, there is only one cell with the minimum value, a next cell
+        with the minimum + 1 and the difference is 3, then the cell with the minimum value is not a
+        bomb. And the next cell with the minimum + 1 if it is a bomb.
 
-        if Cell + self.columns > self.num_cells - 1:
-            Remove.append(Cell + self.columns - 1)
-            Remove.append(Cell + self.columns)
-            Remove.append(Cell + self.columns + 1)
+        This algorithm can be improved and made more versatile. In which there is a general rule.
 
-        if cant == 'rect':
-            Remove.append(Cell - self.columns - 1)
-            Remove.append(Cell - self.columns + 1)
-            Remove.append(Cell + self.columns - 1)
-            Remove.append(Cell + self.columns + 1)
+        Raises:
+            ChildProcessError: in case of inconsistency in the solution
 
-        Remove = list(set(Remove))
-
-        for R in Remove:
-
-            Neighbours.remove(R)
-
-        return Neighbours
-
-    def advance_methods(self):
-
+        Returns:
+            list: cells free bombs
+            list: cells bombs
+        """
         free_booms = []
         booms = []
 
-        for Cell in self.active_cells:
+        for cell in self.active_cells:
             emptys_sum = {}
-            Dif = self.Logic[Cell]['val'] - self.Logic[Cell]['booms']
-            Num_emptys = self.Logic[Cell]['emptys']
-            for empty in self.Logic[Cell]['emptys_neighbors']:
-                emptys_sum[empty] = Dif
+            dif = self.logic[cell]['val'] - self.logic[cell]['booms']
+            num_emptys = self.logic[cell]['emptys']
+            for empty in self.logic[cell]['emptys_neighbors']:
+                emptys_sum[empty] = dif
 
-            Neighbours4 = self.CalculateNeigt(Cell, cant='rect')
-            for Cell2 in Neighbours4:
+            neighbours4 = self.calculate_neighbor(cell, cant='rect')
+            for cell2 in neighbours4:
                 sumas = emptys_sum.copy()
 
-                if Cell2 < Cell:
+                if cell2 not in self.active_cells:
                     continue
 
-                if not (Cell2 in self.active_cells):
+                if cell2 < cell:
                     continue
 
-                if self.Logic[Cell2]['val'] < 1:
-                    continue
+                dif2 = self.logic[cell2]['val'] - self.logic[cell2]['booms']
 
-                Dif2 = self.Logic[Cell2]['val'] - self.Logic[Cell2]['booms']
+                for empty in self.logic[cell2]['emptys_neighbors']:
 
-                for empty in self.Logic[Cell2]['emptys_neighbors']:
-
-                    if empty in list(sumas.keys()):
-                        sumas[empty] += Dif2
+                    if empty in sumas:
+                        sumas[empty] += dif2
                     else:
-                        sumas[empty] = Dif2
+                        sumas[empty] = dif2
 
                 minimum = min(sumas.values())
                 valores = list(sumas.values())
                 claves = list(sumas.keys())
-                Num_emptys2 = self.Logic[Cell2]['emptys']
+                num_emptys2 = self.logic[cell2]['emptys']
 
-                if (len(sumas) == Num_emptys or len(sumas) == Num_emptys2) and Num_emptys2 != Num_emptys and Dif + Dif2 == 2:
+                if ((len(sumas) == num_emptys or len(sumas) == num_emptys2) and
+                   num_emptys != num_emptys2 and dif + dif2 == 2):
                     indexs = np.where(np.array(valores) == minimum)[0]
                     for index in indexs:
                         free_booms.append(claves[index])
 
-                elif len(sumas) == 3 and valores.count(minimum) == 1 and Dif + Dif2 == 3:
+                elif (len(sumas) == 3 and valores.count(minimum) == 1 and dif + dif2 == 3):
 
                     index = valores.index(minimum)
                     booms.append(claves[index])
 
-                elif len(sumas) == 4 and valores.count(minimum) == 1 and valores.count(minimum + 1) == 1:
+                elif (len(sumas) == 4 and valores.count(minimum) == 1 and
+                      valores.count(minimum + 1) == 1 and dif + dif2 == 3):
 
-                    if Dif + Dif2 == 3:
-                        index = valores.index(minimum)
-                        free_booms.append(claves[index])
+                    index = valores.index(minimum)
+                    free_booms.append(claves[index])
 
-                        index = valores.index(minimum + 1)
-                        booms.append(claves[index])
+                    index = valores.index(minimum + 1)
+                    booms.append(claves[index])
 
         free_booms = list(set(free_booms))
         booms = list(set(booms))
-        for Cell in booms:
-            if not (Cell in self.cell_unknown):
-                print('error al calcular: ', Cell)
-                self.Solve_Act
+        for cell in booms:
+            if cell not in self.cell_unknown:
+                raise ChildProcessError(f'Error calculando la celda: {cell}')
 
-            self.IsBoom(Cell)
+            self.is_boom(cell)
 
         return free_booms, booms
 
-    def solve(self):
+    def solve(self) -> None:
+        """
+        Main function that solves the minesweeper game:
+        - Looking for the game window.
+        - Applying the solution algorithms.
+        - Clicking the cells
 
-        if self.FindWindow():
-            print('Fallo al encontrar el area del juego')
-            sys.exit()
+        Raises:
+            RuntimeError: In case the error fin window
+            ChildProcessError: In case the window close
+        """
+        if self.find_window():
+            raise RuntimeError(
+                'Fallo al encontrar el area del juego. asegurese que en su pantalla principal '+
+                'el juego se encuentre abierto')
 
-        if self.FindMatrix():
-            print('Fallo al encontrar la cuadricula del juego')
-            sys.exit()
+        if self.find_matrix():
+            raise RuntimeError(
+                'Fallo al encontrar la cuadricula del juego. '+
+                'El juego no debe haber iniciado posy todas las celdas deben estar en blanco')
 
         cell_init = int(np.random.random() * self.num_cells)
-        self.ClickCells([cell_init])
+        self.click_cells([cell_init])
 
-        self.Solve_Act = True
         max_rand = 10
         free = [cell_init]
         try:
-            while self.Solve_Act:
-                Actualice_ok = False
-                Attemp = 0
-                while not Actualice_ok and Attemp < 10:
-                    Actualice_ok = True
-                    Attemp += 1
-                    self.RefreshGame(free)
+            while True:
+                update_ok = False
+                attemp = 0
+                while not update_ok and attemp < 10:
+                    update_ok = True
+                    attemp += 1
+                    self.refresh_game(free)
                     for cell in free:
                         if cell in self.cell_unknown:
-                            Actualice_ok = False
+                            update_ok = False
                             continue
 
-                if Attemp == 10 and not Actualice_ok:
+                if attemp == 10 and not update_ok:
 
-                    print('No fue posible actualizar los valores del juego')
-                    break
+                    raise ChildProcessError('No fue posible actualizar los valores del juego')
 
-                free, booms = self.CalculateBooms()
+                free, booms = self.difference_algorithm()
 
                 if free:
-                    self.ClickCells(free)
+                    self.click_cells(free)
                     print(free)
 
                 if booms:
-                    self.ClickCells(booms, button='right')
+                    self.click_cells(booms, button='right')
 
                 if not self.cell_unknown:
 
                     print('JUEGO TERMINADO :)')
-                    self.Solve_Act = False
+                    break
 
                 if not free and not booms and self.cell_unknown:
 
-                    free, booms = self.advance_methods()
+                    free, booms = self.neighbor_algorithm()
                     if free:
                         print('libres advance:')
-                        self.ClickCells(free)
+                        self.click_cells(free)
                         print(free)
 
                     if booms:
                         print('Bombas Advance')
-                        self.ClickCells(booms, button='right')
+                        self.click_cells(booms, button='right')
                         print(booms)
 
                     if not free and not booms:
                         max_rand -= 1
                         if not self.random or max_rand < 1:
                             print('No se encontro solución')
-                            self.Solve_Act = False
+                            break
 
                         else:
                             rand = int(np.random.random() * len(self.cell_unknown))
-                            free.append(self.cell_unknown[rand])
-                            self.ClickCells(free)
+                            free = [self.cell_unknown[rand]]
+                            self.click_cells(free)
                             print('Aleatorio!')
 
             self.print_game()
@@ -541,11 +656,14 @@ class MinesWeeperSolver():
         except ChildProcessError as error:
             print(error)
 
-    def print_game(self):
-        for Cell in range(self.num_cells):
-            if self.Logic[Cell]['val'] == -1:
+    def print_game(self) -> None:
+        """
+        Prints the calculated current game frame
+        """
+        for cell in range(self.num_cells):
+            if self.logic[cell]['val'] == -1:
                 print(" ", end=" ")
             else:
-                print(self.Logic[Cell]['val'], end=" ")
-            if (Cell + 1) % self.columns == 0:
+                print(self.logic[cell]['val'], end=" ")
+            if (cell + 1) % self.columns == 0:
                 print(" ")
